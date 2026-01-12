@@ -1,53 +1,73 @@
 import streamlit as st
-import random
+from sentence_transformers import SentenceTransformer, util
+import torch
 
-# 1. 这是一个极其简单的“数据库” (用列表模拟)
-# 以后这里会换成真正的AI搜索，现在先用几句李笑来的话代替
-try:
-    with open("data.txt", "r", encoding="utf-8") as f:
-        content = f.read()
-        # 把一大段文本，按“换行符”切分成一句句，存进列表
-        quotes = content.split("\n") 
-        quotes = [q for q in quotes if q.strip()]
-except FileNotFoundError:
-    quotes = []
-    st.error("出错啦！找不到 data.txt 文件。请确认它和 app.py 在同一个文件夹里！")
-# 2. 搭建网页骨架 (拼图的边框)
-st.title("我的第一个AI搜索神器")
-st.write(f"📚目前收录 {len(quotes)} 条李笑来金句。")
-# --- 新增功能区：侧边栏 (Sidebar) ---
-# st.sidebar 是 Streamlit 的一个拼图块，专门用来放侧边菜单
-st.sidebar.header("功能区")
-# 功能 1: 随机抽取 (手气不错)
-if st.sidebar.button("🎲 随机来一句"):
-    if quotes:
-        lucky_quote = random.choice(quotes) # 从列表里随机选一个
-        st.success("✨ 命运给你的指引：")
-        st.markdown(f"### {lucky_quote}")
-    else:
-        st.warning("数据库是空的哦！")
-# 3. 输入 (Input)
-query = st.text_input("请输入关键词 (例如：时间、学习、拼图):")
+# --- 1. 页面基本设置 ---
+st.title("李笑来 AI 语义搜索 🧠")
+st.write("输入你的困惑，让 AI 帮你从李笑来的文章里找答案。")
 
-# 4. 按钮与逻辑 (Loop & Condition)
-if st.button("开始搜索"):
-    if query: # 如果用户输入了东西
-        st.write(f"正在搜索：{query} ...")
+# --- 2. 加载 AI 模型 (这步最慢，所以要缓存起来) ---
+@st.cache_resource
+def load_model():
+    # 这里我们选一个支持中文的多语言模型
+    return SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+
+with st.spinner('正在启动 AI 大脑，第一次运行需要下载模型，请稍等...'):
+    model = load_model()
+
+# --- 3. 读取并处理数据 ---
+@st.cache_data
+def load_and_encode_data():
+    try:
+        with open("data.txt", "r", encoding="utf-8") as f:
+            lines = f.read().split("\n")
+        # 去掉空行和太短的句子
+        sentences = [line.strip() for line in lines if len(line.strip()) > 5]
         
-        # --- 核心逻辑开始 ---
-        found_results = []
-        for sentence in quotes:
-            # 如果关键词在句子里面
-           if query.lower() in sentence.lower():
-                found_results.append(sentence)
-        # --- 核心逻辑结束 ---
+        if not sentences:
+            return [], None
+            
+        # 关键步骤：把所有句子变成向量 (Embedding)
+        # 这一步会让电脑把文字理解成数字
+        embeddings = model.encode(sentences, convert_to_tensor=True)
+        return sentences, embeddings
+    except FileNotFoundError:
+        return [], None
+
+sentences, sentence_embeddings = load_and_encode_data()
+
+if not sentences:
+    st.error("出错啦！找不到 data.txt，或者文件里没内容。")
+    st.stop()
+
+st.success(f"已加载 {len(sentences)} 条李笑来的智慧。")
+
+# --- 4. 搜索界面 ---
+query = st.text_input("🔍 请输入你的问题 (比如：如何实现财富自由？):")
+
+if st.button("AI 搜索"):
+    if query:
+        # 1. 把用户的问题也变成向量
+        query_embedding = model.encode(query, convert_to_tensor=True)
         
-        # 5. 输出 (Output)
-        if found_results:
-            st.success(f"找到了 {len(found_results)} 条结果：")
-            for result in found_results:
-                st.markdown(f"> {result}") # 显示结果
-        else:
-            st.warning("没有找到相关内容，换个词试试？")
+        # 2. 计算相似度 (Cosine Similarity) - 这就是 AI 的魔法
+        # 也就是算一下你的问题和数据库里的每一句话有多像
+        cos_scores = util.cos_sim(query_embedding, sentence_embeddings)[0]
+        
+        # 3. 找出分数最高的 5 个结果
+        top_results = torch.topk(cos_scores, k=min(5, len(sentences)))
+        
+        st.write("---")
+        st.subheader("AI 认为最相关的答案：")
+        
+        for score, idx in zip(top_results.values, top_results.indices):
+            # score 是相似度分数 (0到1之间，越大越像)
+            if score > 0.3: # 只要分数大于 0.3 的结果
+                st.markdown(f"**相似度 {score:.2f}**")
+                st.info(sentences[idx])
+            else:
+                # 如果分数太低，说明没找到很好的
+                pass
+                
     else:
-        st.error("你还没输入关键词呢！")
+        st.warning("请输入问题！")
