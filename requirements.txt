@@ -1,2 +1,5 @@
 streamlit
+openai
 sentence-transformers
+torch
+langchain-text-splitters
