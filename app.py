@@ -2,8 +2,8 @@ import os
 
 # 注意：如果你刚才加了那个 hf-mirror 的代码，请删掉，换成下面这两句
 # 把 7890 改成你实际的端口号
-os.environ['http_proxy'] = 'http://127.0.0.1:7890'
-os.environ['https_proxy'] = 'http://127.0.0.1:7890'
+#os.environ['http_proxy'] = 'http://127.0.0.1:7890'
+#os.environ['https_proxy'] = 'http://127.0.0.1:7890'
 
 # 下面才是 import streamlit ...
 import streamlit as st
