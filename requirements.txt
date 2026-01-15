@@ -1,5 +1,6 @@
 streamlit
+pandas
 openai
-sentence-transformers
-torch
-langchain-text-splitters
+youtube-transcript-api
+spacy
+# 如果你用了其他特殊的库，也要加在这里
