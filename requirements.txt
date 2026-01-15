@@ -1,6 +1,0 @@
-streamlit
-pandas
-openai
-youtube-transcript-api
-spacy
-# 如果你用了其他特殊的库，也要加在这里
